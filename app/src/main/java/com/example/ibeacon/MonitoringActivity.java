@@ -93,7 +93,6 @@ public class MonitoringActivity extends Activity implements IBeaconConsumer  {
                         public void run() {
                             adapter.notifyDataSetChanged();
                             logToDisplay();
-
                         }
                     });
 

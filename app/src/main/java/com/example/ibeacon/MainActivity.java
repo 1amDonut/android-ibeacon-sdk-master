@@ -1,6 +1,8 @@
 package com.example.ibeacon;
 
+import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.RemoteException;
 import android.support.annotation.NonNull;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -13,27 +15,43 @@ import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.content.Intent;
+import android.widget.ListView;
 import android.widget.SimpleAdapter;
 
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.chaquo.python.PyObject;
+import com.chaquo.python.Python;
+import com.chaquo.python.android.AndroidPlatform;
 import com.google.gson.Gson;
+import com.radiusnetworks.ibeacon.IBeacon;
+import com.radiusnetworks.ibeacon.IBeaconConsumer;
 import com.radiusnetworks.ibeacon.IBeaconManager;
+import com.radiusnetworks.ibeacon.RangeNotifier;
+import com.radiusnetworks.ibeacon.Region;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
+public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener, IBeaconConsumer {
+
+    private IBeaconManager iBeaconManager = IBeaconManager.getInstanceForApplication(this);
+    private ArrayList<IBeacon> arrayL = new ArrayList<IBeacon>();
+
+    private LayoutInflater inflater;
+    private BeaconServiceUtility beaconUtill = null;
     private DrawerLayout drawer;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,7 +62,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         drawer=findViewById(R.id.drawer_layout);
         NavigationView navigationView=findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
-
+        //beacon
+        beaconUtill = new BeaconServiceUtility(this);
+        inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         ActionBarDrawerToggle toggle=new ActionBarDrawerToggle(this,drawer,toolbar,
                 R.string.navigation_drawer_open,R.string.navigation_drawer_close);
         drawer.addDrawerListener(toggle);
@@ -55,8 +75,71 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     new MessageFragment()).commit();
             navigationView.setCheckedItem(R.id.nav_beacon);
         }
+        //python
+        if (! Python.isStarted()) {
+            Context context = this;
+            Python.start(new AndroidPlatform(context));
+        }
         String url = "http://192.168.50.177:8080/api/populer_sort";
         getData(url);
+    }
+    @Override
+    protected void onDestroy(){
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        beaconUtill.onStart(iBeaconManager, this);
+    }
+
+    @Override
+    protected void onStop() {
+        beaconUtill.onStop(iBeaconManager, this);
+        super.onStop();
+    }
+
+    @Override
+    public void onIBeaconServiceConnect(){
+        iBeaconManager.setRangeNotifier(new RangeNotifier() {
+            @Override
+            public void didRangeBeaconsInRegion(Collection<IBeacon> iBeacons, Region region) {
+                arrayL.clear();
+                arrayL.addAll((ArrayList<IBeacon>) iBeacons);
+                Log.d("msg","onIBeaconServiceConnect="+iBeacons.size());
+                if(iBeacons.size()>0){
+                    runOnUiThread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            Log.d("msg","connect num="+arrayL.size());
+                            if(arrayL.size()>=2){
+                                int [] arr = new int[10];
+                                arr[1] = 1;
+                                Log.d("msg","data"+arr[1]);
+                                for(int i=1;i<=arrayL.size();i++){
+                                    //Log.d("msg","beacon="+(arrayL.get(i-1).getRssi()));
+                                    arr[i-1] = arrayL.get(i-1).getRssi();
+                                }
+                                Log.d("msg","beacon data="+arr[0]+"|"+arr[1]);
+                                Python py = Python.getInstance();
+                                PyObject pym = py.getModule("read_location");
+                                PyObject pyf = pym.callAttr("test",arr[0],arr[1]);
+                                Log.d("msg","beacon_location="+pyf.toString());
+                            }
+                        }
+                    });
+
+                }
+            }
+        });
+        try{
+            iBeaconManager.startRangingBeaconsInRegion(new Region("myRangingUniqueId",null,null,null));
+        }catch (RemoteException e){}
+        try {
+            iBeaconManager.startMonitoringBeaconsInRegion(new Region("myRangingUniqueId",null,null,null));
+        }catch (RemoteException e){}
     }
 
     @Override
@@ -72,8 +155,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             case R.id.nav_Popular:
                 getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,
                         new PopularFragment()).commit();
-                Intent populer_Intent = new Intent(this,PopolarActivity.class);
-                this.startActivity(populer_Intent);
+                /*Intent populer_Intent = new Intent(this,PopolarActivity.class);
+                this.startActivity(populer_Intent);*/
                 break;
 
         }

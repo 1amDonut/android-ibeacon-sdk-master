@@ -3,7 +3,6 @@ package com.example.ibeacon;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
 
@@ -11,6 +10,8 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -28,7 +29,7 @@ public class PopolarActivity extends AppCompatActivity {
         setContentView(R.layout.activity_popolar);
 
         listView=(ListView)findViewById(R.id.listviewJsonData);
-        String url = "http://192.168.50.177:8080/api/product";
+        String url = "http://172.20.10.7:8080/connect.php";
         getData(url);
     }
     public String getData(String urlString){
@@ -41,8 +42,11 @@ public class PopolarActivity extends AppCompatActivity {
                             //Velloy採非同步作業，Response.Listener  監聽回應
                             public void onResponse(JSONObject response) {
                                 Log.d("回傳結果", "結果=" + response.toString());
+
                                 try {
-                                    parseJSON(response);
+                                    String data = response.getString("a");
+                                    Log.d("msg","name="+data);
+                                    //parseJSON(response);
                                 } catch (JSONException e) {
                                     e.printStackTrace();
                                 }
@@ -60,7 +64,9 @@ public class PopolarActivity extends AppCompatActivity {
         private void parseJSON(JSONObject jsonObject) throws JSONException{
         ArrayList<Map<String,Object>> list = new ArrayList<Map<String, Object>>();
 
-        JSONArray data = jsonObject.getJSONArray("data");
+        JSONArray data = jsonObject.getJSONArray("posts");
+        Log.d("msg","data="+data.getJSONObject(0).get("a"));
+
         for  (int i = 0; i < data.length(); i++){
 
             HashMap<String,Object> item  = new HashMap<String, Object>();
